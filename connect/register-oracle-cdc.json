@@ -1,0 +1,24 @@
+{
+    "name": "oracle-connector",
+    "config": {
+        "connector.class": "io.debezium.connector.oracle.OracleConnector",
+        "tasks.max": "1",
+        "topic.prefix": "oracle",
+        "database.hostname": "oracle",
+        "database.port": "1521",
+        "database.user": "c##dbzuser",
+        "database.password": "dbz",
+        "database.dbname": "FREE",
+        "database.pdb.name": "FREEPDB1",
+        "schema.history.internal.kafka.bootstrap.servers": "kafka:29092",
+        "schema.history.internal.kafka.topic": "schema-changes.oracle",
+        "table.include.list": "MYUSER.CUSTOMER,MYUSER.ORDERS,MYUSER.PAYMENT",
+        "schema.include.list": "MYUSER",
+        "log.mining.strategy": "online_catalog",
+        "log.mining.continuous.mine": "true",
+        "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "false",
+        "value.converter.schemas.enable": "false"
+    }
+}
