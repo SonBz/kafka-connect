@@ -1,0 +1,16 @@
+{
+    "name": "oracle-sink-connector",
+    "config": {
+        "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+        "tasks.max": "1",
+        "topics": "my-topic",
+        "connection.url": "jdbc:oracle:thin:@oracle:1521/FREEPDB1",
+        "connection.user": "myuser",
+        "connection.password": "mypassword",
+        "auto.create": "true",
+        "auto.evolve": "true",
+        "insert.mode": "insert",
+        "pk.mode": "record_key",
+        "pk.fields": "id"
+    }
+}

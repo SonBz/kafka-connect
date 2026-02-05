@@ -74,7 +74,7 @@ public class StreamsConfig {
                 .selectKey((k, v) -> v.getId()) // Rekey by ID just in case
                 .toTable(Materialized.with(Serdes.Long(), customerSerde));
 
-        // 2. Stream Orders
+        // 2. Stream Order
         KStream<Long, Order> orderStream = builder.stream(ordersTopic, Consumed.with(Serdes.String(), Serdes.String()))
                 .mapValues(val -> extract(val, Order.class, mapper))
                 .filter((k, v) -> v != null)

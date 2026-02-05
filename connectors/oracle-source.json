@@ -1,0 +1,16 @@
+
+{
+    "name": "oracle-source-connector",
+    "config": {
+        "connector.class": "io.confluent.connect.jdbc.JdbcSourceConnector",
+        "tasks.max": "1",
+        "connection.url": "jdbc:oracle:thin:@oracle:1521/FREEPDB1",
+        "connection.user": "myuser",
+        "connection.password": "mypassword",
+        "mode": "incrementing",
+        "incrementing.column.name": "ID",
+        "topic.prefix": "oracle-",
+        "table.whitelist": "CUSTOMER,ORDERS,PAYMENT",
+        "poll.interval.ms": "5000"
+    }
+}
