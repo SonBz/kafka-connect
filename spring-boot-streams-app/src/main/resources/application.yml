@@ -20,14 +20,14 @@ spring:
         # processing.guarantee: exactly_once_v2 # Optional for safer headers
 
   # Custom properties to define topics
-  app:
-    topics:
-      customer: oracle.MYUSER.CUSTOMER
-      orders: oracle.MYUSER.ORDERS
-      payment: oracle.MYUSER.PAYMENT
-      enriched-orders: enriched.orders
-      order-paid: events.order_paid
-      daily-revenue: analytics.daily_revenue
+app:
+  topics:
+    customer: oracle-CUSTOMER
+    orders: oracle-ORDERS
+    payment: oracle-PAYMENT
+    enriched-orders: enriched-orders
+    order-paid: events-order_paid
+    daily-revenue: analytics-daily_revenue
 
 server:
   port: 8081

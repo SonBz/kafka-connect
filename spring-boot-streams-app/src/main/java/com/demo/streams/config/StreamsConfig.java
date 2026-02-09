@@ -8,9 +8,12 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.common.utils.Bytes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.EnableKafkaStreams;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.support.serializer.JsonSerde;
 
@@ -21,6 +24,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 @Configuration
+@EnableKafkaStreams
 @RequiredArgsConstructor
 @Slf4j
 public class StreamsConfig {
@@ -66,19 +70,34 @@ public class StreamsConfig {
         // Key is struct/json: {"id": 1}.
 
         // Helper to extract data from Debezium JSON
+        log.info("customerTopic = {}", customerTopic);
+
 
         KTable<Long, Customer> customerTable = builder
                 .stream(customerTopic, Consumed.with(Serdes.String(), Serdes.String()))
-                .mapValues(val -> extract(val, Customer.class, mapper))
+                .mapValues(val -> {
+                    log.info("Received customer: {}", val);
+                    Customer c = extract(val, Customer.class, mapper);
+                    return c;
+                })
                 .filter((k, v) -> v != null)
                 .selectKey((k, v) -> v.getId()) // Rekey by ID just in case
-                .toTable(Materialized.with(Serdes.Long(), customerSerde));
+                .toTable(Materialized.<Long, Customer, KeyValueStore<Bytes, byte[]>>as("customer-store")
+                        .withKeySerde(Serdes.Long())
+                        .withValueSerde(customerSerde));
 
         // 2. Stream Order
-        KStream<Long, Order> orderStream = builder.stream(ordersTopic, Consumed.with(Serdes.String(), Serdes.String()))
+        KStream<Long, Order> orderStream = builder
+        .stream(ordersTopic, Consumed.with(Serdes.String(), Serdes.String()))
                 .mapValues(val -> extract(val, Order.class, mapper))
                 .filter((k, v) -> v != null)
                 .selectKey((k, v) -> v.getId());
+
+        KStream<Long, Order> orderStreamByCustomerId = builder
+        .stream(ordersTopic, Consumed.with(Serdes.String(), Serdes.String()))
+                .mapValues(val -> extract(val, Order.class, mapper))
+                .filter((k, v) -> v != null)
+                .selectKey((k, v) -> v.getCustomerId());
 
         // 3. Stream Payments
         KStream<Long, Payment> paymentStream = builder
@@ -88,11 +107,13 @@ public class StreamsConfig {
                 .selectKey((k, v) -> v.getOrderId()); // Key by OrderID to join
 
         // 4. Join Orders + Customer -> EnrichedOrder
-        KStream<Long, EnrichedOrder> enrichedOrders = orderStream.join(customerTable,
+        KStream<Long, EnrichedOrder> enrichedOrders = orderStreamByCustomerId.join(customerTable,
                 (order, customer) -> new EnrichedOrder(order, customer),
                 Joined.with(Serdes.Long(), orderSerde, customerSerde));
 
-        enrichedOrders.to(enrichedOrdersTopic, Produced.with(Serdes.Long(), enrichedOrderSerde));
+        enrichedOrders.peek((key, value) -> 
+            log.info("EnrichedOrder key={}, value={}", key, value)
+        ).to(enrichedOrdersTopic, Produced.with(Serdes.Long(), enrichedOrderSerde));
 
         // 5. Join Payment + EnrichedOrder -> OrderPaidEvent
         // Require re-keying EnrichedOrder to ID? No, it's keyed by OrderID (v.getId()
@@ -145,17 +166,18 @@ public class StreamsConfig {
     private <T> T extract(String json, Class<T> clazz, ObjectMapper mapper) {
         try {
             // Robust generic parsing
-            com.fasterxml.jackson.databind.JavaType type = mapper.getTypeFactory()
-                    .constructParametricType(DebeziumEvent.class, clazz);
-            DebeziumEvent<T> event = mapper.readValue(json, type);
+            // com.fasterxml.jackson.databind.JavaType type = mapper.getTypeFactory()
+            //         .constructParametricType(DebeziumEvent.class, clazz);
+            // DebeziumEvent<T> event = mapper.readValue(json, type);
 
-            if (event.getPayload() != null && event.getPayload().getAfter() != null) {
-                return event.getPayload().getAfter();
-            }
+            // if (event.getPayload() != null && event.getPayload().getAfter() != null) {
+            //     return event.getPayload().getAfter();
+            // }
+            return mapper.readValue(json, clazz);
         } catch (Exception e) {
-            // log.warn("Skipping message: {}", e.getMessage());
+            log.warn("Skipping message: {}", e.getMessage());
+            return null;
         }
-        return null;
     }
 
     private void upsertRevenue(DailyRevenue dr) {
